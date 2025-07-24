@@ -24,6 +24,10 @@ export async function handleAPI(request, env, path) {
     return await getGroups(request, env, corsHeaders);
   }
   
+  if (path === '/api/wishes/clear' && request.method === 'POST') {
+    return await clearWishes(request, env, corsHeaders);
+  }
+  
   return new Response('API Not Found', { status: 404, headers: corsHeaders });
 }
 
@@ -184,6 +188,75 @@ async function completeWish(request, env, corsHeaders) {
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: '标记完成失败: ' + error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
+
+// 清理许愿数据
+async function clearWishes(request, env, corsHeaders) {
+  try {
+    const data = await request.json();
+    const { password, group, type } = data;
+    
+    // 验证密码
+    if (password !== '627') {
+      return new Response(JSON.stringify({ error: '密码错误' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+    
+    let deletedCount = 0;
+    
+    if (type === 'all') {
+      // 清理所有许愿数据
+      const listResult = await env.WISHES_KV.list({ prefix: 'wish:' });
+      
+      for (const key of listResult.keys) {
+        await env.WISHES_KV.delete(key.name);
+        deletedCount++;
+      }
+    } else if (type === 'group' && group) {
+      // 清理指定群组的数据
+      const listResult = await env.WISHES_KV.list({ prefix: `wish:${group}:` });
+      
+      for (const key of listResult.keys) {
+        await env.WISHES_KV.delete(key.name);
+        deletedCount++;
+      }
+    } else if (type === 'completed') {
+      // 清理已完成的许愿
+      const prefix = group ? `wish:${group}:` : 'wish:';
+      const listResult = await env.WISHES_KV.list({ prefix });
+      
+      for (const key of listResult.keys) {
+        const wishData = await env.WISHES_KV.get(key.name);
+        if (wishData) {
+          const wish = JSON.parse(wishData);
+          if (wish.completed) {
+            await env.WISHES_KV.delete(key.name);
+            deletedCount++;
+          }
+        }
+      }
+    } else {
+      return new Response(JSON.stringify({ error: '无效的清理类型' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      deletedCount,
+      message: `成功清理了 ${deletedCount} 条许愿数据`
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: '清理数据失败: ' + error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });

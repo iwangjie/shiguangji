@@ -803,6 +803,8 @@ export function getAdminHTML() {
                 <button type="button" class="btn btn-clear" onclick="clearCompleted()">🗑️ 清理已完成</button>
                 <button type="button" class="btn" onclick="showStats()" style="background: #17a2b8;">📈 详细统计</button>
                 <button type="button" class="btn" onclick="batchComplete()" style="background: #ffc107; color: #000;">✅ 批量完成</button>
+                <button type="button" class="btn btn-clear" onclick="clearGroupData()" style="background: #fd7e14;">🗑️ 清理群组数据</button>
+                <button type="button" class="btn btn-clear" onclick="clearAllData()" style="background: #dc3545;">⚠️ 清理所有数据</button>
             </div>
         </div>
         
@@ -1113,7 +1115,120 @@ export function getAdminHTML() {
                 return;
             }
             
-            alert('清理功能需要后端支持，当前版本暂不支持删除操作');
+            const password = prompt('请输入管理密码：');
+            if (!password) return;
+            
+            try {
+                const group = document.getElementById('groupSelect').value;
+                const response = await fetch('/api/wishes/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        password, 
+                        type: 'completed',
+                        group 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(\`清理成功！\${result.message}\`);
+                    loadData(); // 重新加载数据
+                } else {
+                    alert('清理失败：' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('网络错误，请重试');
+                console.error('Error:', error);
+            }
+        }
+        
+        // 清理群组数据
+        async function clearGroupData() {
+            const group = document.getElementById('groupSelect').value;
+            if (!group) {
+                alert('请先选择群组');
+                return;
+            }
+            
+            if (!currentData || currentData.total === 0) {
+                alert('当前群组没有数据需要清理');
+                return;
+            }
+            
+            if (!confirm(\`确定要删除群组 "\${group}" 的所有 \${currentData.total} 条许愿数据吗？此操作不可恢复！\`)) {
+                return;
+            }
+            
+            const password = prompt('请输入管理密码：');
+            if (!password) return;
+            
+            try {
+                const response = await fetch('/api/wishes/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        password, 
+                        type: 'group',
+                        group 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(\`清理成功！\${result.message}\`);
+                    loadData(); // 重新加载数据
+                } else {
+                    alert('清理失败：' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('网络错误，请重试');
+                console.error('Error:', error);
+            }
+        }
+        
+        // 清理所有数据
+        async function clearAllData() {
+            if (!confirm('⚠️ 警告：确定要删除所有群组的所有许愿数据吗？\\n\\n此操作将清空整个数据库，不可恢复！')) {
+                return;
+            }
+            
+            if (!confirm('请再次确认：您真的要删除所有数据吗？\\n\\n这将影响所有用户和群组！')) {
+                return;
+            }
+            
+            const password = prompt('请输入管理密码（627）：');
+            if (!password) return;
+            
+            try {
+                const response = await fetch('/api/wishes/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        password, 
+                        type: 'all'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(\`清理成功！\${result.message}\`);
+                    // 清空当前数据并刷新界面
+                    currentData = null;
+                    originalData = null;
+                    document.getElementById('content').innerHTML = '<div class="empty">请选择群体查询数据</div>';
+                    document.getElementById('filterSection').style.display = 'none';
+                    refreshGroups(); // 刷新群组列表
+                } else {
+                    alert('清理失败：' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('网络错误，请重试');
+                console.error('Error:', error);
+            }
         }
         
         // 显示详细统计
