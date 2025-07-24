@@ -3,7 +3,7 @@ main = "src/index.js"
 compatibility_date = "2024-01-01"
 
 [[kv_namespaces]]
-binding = "shiguangji"
+binding = "WISHES_KV"
 id = "475ce973f9cb4e18b3f004e794b4eab7"
 preview_id = "475ce973f9cb4e18b3f004e794b4eab7"
 
