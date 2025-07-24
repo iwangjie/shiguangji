@@ -197,7 +197,11 @@ export function getIndexHTML() {
             <form id="userForm">
                 <div class="form-group">
                     <label for="modalGroup">群组名称</label>
-                    <input type="text" id="modalGroup" placeholder="例如：开发小组" required>
+                    <select id="modalGroup" required>
+                        <option value="">选择或输入群组名称</option>
+                        <option value="默认群组">默认群组</option>
+                    </select>
+                    <input type="text" id="customGroup" placeholder="或输入新的群组名称" style="margin-top: 10px; display: none;">
                 </div>
                 <div class="form-group">
                     <label for="modalUserName">您的姓名</label>
@@ -278,14 +282,51 @@ export function getIndexHTML() {
         
         // 页面加载时检查用户信息
         window.addEventListener('load', function() {
+            loadGroups(); // 加载群组列表
             const savedUserInfo = localStorage.getItem('userInfo');
             if (savedUserInfo) {
                 userInfo = JSON.parse(savedUserInfo);
                 showUserInfo();
             } else {
+                // 设置默认群组并显示模态框
+                document.getElementById('modalGroup').value = '默认群组';
                 showUserModal();
             }
         });
+        
+        // 加载群组列表
+        async function loadGroups() {
+            try {
+                const response = await fetch('/api/groups');
+                const data = await response.json();
+                
+                if (response.ok && data.groups) {
+                    const groupSelect = document.getElementById('modalGroup');
+                    // 清空现有选项（除了默认选项）
+                    while (groupSelect.children.length > 2) {
+                        groupSelect.removeChild(groupSelect.lastChild);
+                    }
+                    
+                    // 添加现有群组选项
+                    data.groups.forEach(group => {
+                        if (group !== '默认群组') {
+                            const option = document.createElement('option');
+                            option.value = group;
+                            option.textContent = group;
+                            groupSelect.appendChild(option);
+                        }
+                    });
+                    
+                    // 添加自定义选项
+                    const customOption = document.createElement('option');
+                    customOption.value = 'custom';
+                    customOption.textContent = '自定义群组...';
+                    groupSelect.appendChild(customOption);
+                }
+            } catch (error) {
+                console.error('加载群组列表失败:', error);
+            }
+        }
         
         // 显示用户信息模态框
         function showUserModal() {
@@ -309,12 +350,35 @@ export function getIndexHTML() {
             showUserModal();
         }
         
+        // 群组选择变化事件
+        document.getElementById('modalGroup').addEventListener('change', function() {
+            const customGroupInput = document.getElementById('customGroup');
+            if (this.value === 'custom') {
+                customGroupInput.style.display = 'block';
+                customGroupInput.required = true;
+            } else {
+                customGroupInput.style.display = 'none';
+                customGroupInput.required = false;
+                customGroupInput.value = '';
+            }
+        });
+        
         // 用户信息表单提交
         document.getElementById('userForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const group = document.getElementById('modalGroup').value.trim();
+            let group = document.getElementById('modalGroup').value.trim();
+            const customGroup = document.getElementById('customGroup').value.trim();
             const userName = document.getElementById('modalUserName').value.trim();
+            
+            // 如果选择了自定义群组，使用自定义输入的值
+            if (group === 'custom') {
+                if (!customGroup) {
+                    alert('请输入自定义群组名称');
+                    return;
+                }
+                group = customGroup;
+            }
             
             if (!group || !userName) {
                 alert('请填写完整信息');
@@ -380,7 +444,7 @@ export function getIndexHTML() {
 </html>`;
 }
 
-// 管理页面HTML
+// 管理页面HTML - 增强版
 export function getAdminHTML() {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -434,10 +498,38 @@ export function getAdminHTML() {
             display: flex;
             gap: 15px;
             align-items: end;
+            flex-wrap: wrap;
+        }
+        
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         .form-group {
             flex: 1;
+            min-width: 200px;
+        }
+        
+        .search-input {
+            min-width: 250px;
         }
         
         label {
@@ -463,10 +555,19 @@ export function getAdminHTML() {
             border-radius: 8px;
             cursor: pointer;
             font-weight: 500;
+            white-space: nowrap;
         }
         
         .btn:hover {
             opacity: 0.9;
+        }
+        
+        .btn-export {
+            background: #28a745;
+        }
+        
+        .btn-clear {
+            background: #dc3545;
         }
         
         .stats {
@@ -635,6 +736,20 @@ export function getAdminHTML() {
             padding: 40px;
             color: #999;
         }
+        
+        @media (max-width: 768px) {
+            .search-form, .filter-row {
+                flex-direction: column;
+            }
+            
+            .form-group {
+                min-width: 100%;
+            }
+            
+            .btn-group {
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -648,15 +763,52 @@ export function getAdminHTML() {
             <div class="search-form">
                 <div class="form-group">
                     <label for="groupSelect">选择群体</label>
-                    <input type="text" id="groupSelect" placeholder="输入群体编码，例如：开发小组">
+                    <select id="groupSelect">
+                        <option value="">请选择群体</option>
+                        <option value="默认群组">默认群组</option>
+                    </select>
                 </div>
                 <button type="button" class="btn" onclick="loadData()">查询</button>
+                <button type="button" class="btn" onclick="refreshGroups()" style="background: #6c757d;">刷新群组</button>
+            </div>
+        </div>
+        
+        <div class="filter-section" id="filterSection" style="display: none;">
+            <h3 style="margin-bottom: 15px; color: #333;">🔍 高级功能</h3>
+            <div class="filter-row">
+                <div class="form-group search-input">
+                    <label for="searchInput">搜索许愿</label>
+                    <input type="text" id="searchInput" placeholder="搜索目的地、用户名或出行方式..." onkeyup="filterWishes()">
+                </div>
+                <div class="form-group">
+                    <label for="statusFilter">状态筛选</label>
+                    <select id="statusFilter" onchange="filterWishes()">
+                        <option value="">全部状态</option>
+                        <option value="pending">待完成</option>
+                        <option value="completed">已完成</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sortBy">排序方式</label>
+                    <select id="sortBy" onchange="sortWishes()">
+                        <option value="date">按时间排序</option>
+                        <option value="destination">按目的地排序</option>
+                        <option value="user">按用户排序</option>
+                        <option value="days">按天数排序</option>
+                    </select>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-export" onclick="exportData()">📊 导出数据</button>
+                <button type="button" class="btn btn-clear" onclick="clearCompleted()">🗑️ 清理已完成</button>
+                <button type="button" class="btn" onclick="showStats()" style="background: #17a2b8;">📈 详细统计</button>
+                <button type="button" class="btn" onclick="batchComplete()" style="background: #ffc107; color: #000;">✅ 批量完成</button>
             </div>
         </div>
         
         <div id="content">
             <div class="empty">
-                请输入群体编码查询数据
+                请选择群体查询数据
             </div>
         </div>
         
@@ -667,11 +819,56 @@ export function getAdminHTML() {
     
     <script>
         let currentData = null;
+        let originalData = null;
+        
+        // 页面加载时加载群组列表
+        window.addEventListener('load', function() {
+            loadGroups();
+        });
+        
+        // 加载群组列表
+        async function loadGroups() {
+            try {
+                const response = await fetch('/api/groups');
+                const data = await response.json();
+                
+                if (response.ok && data.groups) {
+                    const groupSelect = document.getElementById('groupSelect');
+                    // 清空现有选项（除了默认选项）
+                    while (groupSelect.children.length > 2) {
+                        groupSelect.removeChild(groupSelect.lastChild);
+                    }
+                    
+                    // 添加现有群组选项
+                    data.groups.forEach(group => {
+                        if (group !== '默认群组') {
+                            const option = document.createElement('option');
+                            option.value = group;
+                            option.textContent = group;
+                            groupSelect.appendChild(option);
+                        }
+                    });
+                    
+                    // 如果只有一个群组，自动选中并加载数据
+                    if (data.groups.length === 1) {
+                        groupSelect.value = data.groups[0];
+                        loadData();
+                    }
+                }
+            } catch (error) {
+                console.error('加载群组列表失败:', error);
+            }
+        }
+        
+        // 刷新群组列表
+        async function refreshGroups() {
+            await loadGroups();
+        }
         
         async function loadData() {
             const group = document.getElementById('groupSelect').value.trim();
             if (!group) {
-                alert('请输入群体编码');
+                alert('请选择群体');
                 return;
             }
             
@@ -684,6 +881,7 @@ export function getAdminHTML() {
                 
                 if (response.ok) {
                     currentData = data;
+                    originalData = JSON.parse(JSON.stringify(data)); // 深拷贝
                     renderData(data);
                 } else {
                     content.innerHTML = '<div class="empty">加载失败：' + (data.error || '未知错误') + '</div>';
@@ -699,6 +897,7 @@ export function getAdminHTML() {
             
             if (data.total === 0) {
                 content.innerHTML = '<div class="empty">暂无许愿数据</div>';
+                document.getElementById('filterSection').style.display = 'none';
                 return;
             }
             
@@ -729,8 +928,8 @@ export function getAdminHTML() {
                         <h2>🏆 热门目的地</h2>
                         <p>点击查看详细许愿列表</p>
                     </div>
-                    \${data.destinations.map(dest => \`
-                        <div class="destination-item" onclick="toggleWishes('\${dest.destination}')">
+                    \${data.destinations.map((dest, index) => \`
+                        <div class="destination-item" onclick="toggleWishes(\${index})">
                             <div class="destination-header">
                                 <div class="destination-name">\${dest.destination}</div>
                                 <div class="destination-count">\${dest.count}个许愿</div>
@@ -738,9 +937,9 @@ export function getAdminHTML() {
                             <div class="destination-stats">
                                 已完成: \${dest.completed} | 待完成: \${dest.count - dest.completed}
                             </div>
-                            <div class="wishes-list" id="wishes-\${dest.destination.replace(/[^a-zA-Z0-9]/g, '_')}">
+                            <div class="wishes-list" id="wishes-\${index}">
                                 \${dest.wishes.map(wish => \`
-                                    <div class="wish-item">
+                                    <div class="wish-item" data-wish-id="\${wish.id}">
                                         <div class="wish-info">
                                             <div><strong>\${wish.destination}</strong> - <span class="wish-user">\${wish.userName || '未知用户'}</span></div>
                                             <div class="wish-details">
@@ -761,10 +960,13 @@ export function getAdminHTML() {
                     \`).join('')}
                 </div>
             \`;
+            
+            // 显示高级功能区域
+            document.getElementById('filterSection').style.display = 'block';
         }
         
-        function toggleWishes(destination) {
-            const wishesDiv = document.getElementById('wishes-' + destination.replace(/[^a-zA-Z0-9]/g, '_'));
+        function toggleWishes(index) {
+            const wishesDiv = document.getElementById('wishes-' + index);
             if (wishesDiv.style.display === 'none' || !wishesDiv.style.display) {
                 wishesDiv.style.display = 'block';
             } else {
@@ -796,9 +998,202 @@ export function getAdminHTML() {
             }
         }
         
+        // 搜索和过滤功能
+        function filterWishes() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            if (!originalData) return;
+            
+            const filteredDestinations = originalData.destinations.map(dest => {
+                const filteredWishes = dest.wishes.filter(wish => {
+                    const matchesSearch = !searchTerm || 
+                        wish.destination.toLowerCase().includes(searchTerm) ||
+                        wish.userName.toLowerCase().includes(searchTerm) ||
+                        wish.travelMode.toLowerCase().includes(searchTerm);
+                    
+                    const matchesStatus = !statusFilter ||
+                        (statusFilter === 'pending' && !wish.completed) ||
+                        (statusFilter === 'completed' && wish.completed);
+                    
+                    return matchesSearch && matchesStatus;
+                });
+                
+                return {
+                    ...dest,
+                    wishes: filteredWishes,
+                    count: filteredWishes.length,
+                    completed: filteredWishes.filter(w => w.completed).length
+                };
+            }).filter(dest => dest.count > 0);
+            
+            const filteredData = {
+                ...originalData,
+                destinations: filteredDestinations,
+                total: filteredDestinations.reduce((sum, dest) => sum + dest.count, 0),
+                wishes: filteredDestinations.flatMap(dest => dest.wishes)
+            };
+            
+            currentData = filteredData;
+            renderData(filteredData);
+        }
+        
+        // 排序功能
+        function sortWishes() {
+            const sortBy = document.getElementById('sortBy').value;
+            
+            if (!currentData) return;
+            
+            const sortedDestinations = currentData.destinations.map(dest => {
+                const sortedWishes = [...dest.wishes].sort((a, b) => {
+                    switch (sortBy) {
+                        case 'date':
+                            return new Date(b.createdAt) - new Date(a.createdAt);
+                        case 'destination':
+                            return a.destination.localeCompare(b.destination);
+                        case 'user':
+                            return a.userName.localeCompare(b.userName);
+                        case 'days':
+                            return b.days - a.days;
+                        default:
+                            return 0;
+                    }
+                });
+                
+                return { ...dest, wishes: sortedWishes };
+            });
+            
+            const sortedData = { ...currentData, destinations: sortedDestinations };
+            renderData(sortedData);
+        }
+        
+        // 导出数据功能
+        function exportData() {
+            if (!currentData) {
+                alert('没有数据可导出');
+                return;
+            }
+            
+            const csvContent = [
+                ['目的地', '用户名', '出行方式', '出行时间', '天数', '状态', '创建时间', '完成时间'].join(','),
+                ...currentData.wishes.map(wish => [
+                    wish.destination,
+                    wish.userName,
+                    wish.travelMode,
+                    wish.timeframe,
+                    wish.days,
+                    wish.completed ? '已完成' : '待完成',
+                    new Date(wish.createdAt).toLocaleString('zh-CN'),
+                    wish.completedAt ? new Date(wish.completedAt).toLocaleString('zh-CN') : ''
+                ].join(','))
+            ].join('\\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', \`旅行许愿数据_\${new Date().toISOString().split('T')[0]}.csv\`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // 清理已完成的许愿
+        async function clearCompleted() {
+            if (!currentData) return;
+            
+            const completedWishes = currentData.wishes.filter(w => w.completed);
+            if (completedWishes.length === 0) {
+                alert('没有已完成的许愿需要清理');
+                return;
+            }
+            
+            if (!confirm(\`确定要删除 \${completedWishes.length} 个已完成的许愿吗？此操作不可恢复。\`)) {
+                return;
+            }
+            
+            alert('清理功能需要后端支持，当前版本暂不支持删除操作');
+        }
+        
+        // 显示详细统计
+        function showStats() {
+            if (!currentData) return;
+            
+            const stats = {
+                totalWishes: currentData.total,
+                completedWishes: currentData.wishes.filter(w => w.completed).length,
+                pendingWishes: currentData.wishes.filter(w => !w.completed).length,
+                uniqueUsers: new Set(currentData.wishes.map(w => w.userName)).size,
+                avgDays: Math.round(currentData.wishes.reduce((sum, w) => sum + w.days, 0) / currentData.total),
+                mostPopularMode: getMostPopular(currentData.wishes.map(w => w.travelMode)),
+                mostPopularTime: getMostPopular(currentData.wishes.map(w => w.timeframe))
+            };
+            
+            alert(\`📈 详细统计信息：
+            
+总许愿数：\${stats.totalWishes}
+已完成：\${stats.completedWishes}
+待完成：\${stats.pendingWishes}
+参与用户：\${stats.uniqueUsers}人
+平均天数：\${stats.avgDays}天
+最受欢迎出行方式：\${stats.mostPopularMode}
+最受欢迎时间：\${stats.mostPopularTime}\`);
+        }
+        
+        function getMostPopular(array) {
+            if (array.length === 0) return '无';
+            const counts = {};
+            array.forEach(item => counts[item] = (counts[item] || 0) + 1);
+            return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        }
+        
+        // 批量完成功能
+        async function batchComplete() {
+            if (!currentData) return;
+            
+            const pendingWishes = currentData.wishes.filter(w => !w.completed);
+            if (pendingWishes.length === 0) {
+                alert('没有待完成的许愿');
+                return;
+            }
+            
+            const selectedDestination = prompt(\`请输入要批量完成的目的地名称：\\n\\n可选目的地：\\n\${currentData.destinations.map(d => d.destination).join('\\n')}\`);
+            
+            if (!selectedDestination) return;
+            
+            const targetWishes = pendingWishes.filter(w => w.destination === selectedDestination);
+            if (targetWishes.length === 0) {
+                alert('没有找到该目的地的待完成许愿');
+                return;
+            }
+            
+            if (!confirm(\`确定要将 "\${selectedDestination}" 的 \${targetWishes.length} 个许愿标记为已完成吗？\`)) {
+                return;
+            }
+            
+            // 批量完成
+            let successCount = 0;
+            for (const wish of targetWishes) {
+                try {
+                    const response = await fetch('/api/wishes/complete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ group: wish.group, wishId: wish.id })
+                    });
+                    if (response.ok) successCount++;
+                } catch (error) {
+                    console.error('批量完成失败:', error);
+                }
+            }
+            
+            alert(\`批量操作完成！成功标记 \${successCount}/\${targetWishes.length} 个许愿\`);
+            loadData(); // 重新加载数据
+        }
+        
         // 回车键查询
-        document.getElementById('groupSelect').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+        document.getElementById('groupSelect').addEventListener('change', function() {
+            if (this.value) {
                 loadData();
             }
         });

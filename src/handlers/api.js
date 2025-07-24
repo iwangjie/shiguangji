@@ -20,6 +20,10 @@ export async function handleAPI(request, env, path) {
     return await completeWish(request, env, corsHeaders);
   }
   
+  if (path === '/api/groups' && request.method === 'GET') {
+    return await getGroups(request, env, corsHeaders);
+  }
+  
   return new Response('API Not Found', { status: 404, headers: corsHeaders });
 }
 
@@ -119,6 +123,34 @@ async function getWishes(request, env, corsHeaders) {
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: '获取许愿列表失败: ' + error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
+
+// 获取所有群组列表
+async function getGroups(request, env, corsHeaders) {
+  try {
+    // 获取所有许愿记录
+    const listResult = await env.WISHES_KV.list({ prefix: 'wish:' });
+    const groups = new Set();
+    
+    for (const key of listResult.keys) {
+      // 从key中提取群组名称: wish:群组名:许愿ID
+      const parts = key.name.split(':');
+      if (parts.length >= 2) {
+        groups.add(parts[1]);
+      }
+    }
+    
+    return new Response(JSON.stringify({ 
+      groups: Array.from(groups).sort()
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: '获取群组列表失败: ' + error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
