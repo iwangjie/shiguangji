@@ -203,7 +203,7 @@ async function completeWish(request, env, corsHeaders) {
 
 // 生成唯一ID
 function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
 }
 
 // 主页HTML
@@ -445,8 +445,9 @@ function getIndexHTML() {
     </script>
 </body>
 </html>`;
-}// 管
-理页面HTML
+}
+
+// 管理页面HTML
 function getAdminHTML() {
   return `<!DOCTYPE html>
 <html lang="zh-CN">

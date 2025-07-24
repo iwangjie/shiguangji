@@ -1,17 +1,22 @@
 {
-  "name": "shiguangji",
-  "version": "1.0.0",
-  "description": "旅行许愿时光机 - 基于 Cloudflare Worker",
-  "main": "src/index.js",
-  "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
-  },
-  "keywords": ["cloudflare", "worker", "travel", "wish"],
-  "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "wrangler": "^3.0.0"
-  }
+    "name": "shiguangji",
+    "version": "1.0.0",
+    "description": "旅行许愿时光机 - 基于 Cloudflare Worker",
+    "main": "src/index.js",
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "tail": "wrangler tail"
+    },
+    "keywords": [
+        "cloudflare",
+        "worker",
+        "travel",
+        "wish"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "wrangler": "^3.0.0"
+    }
 }
